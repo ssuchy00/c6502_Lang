@@ -56,13 +56,13 @@ void Compiler_Compile(Compiler* compiler)
 
 	compiler->tokenizer->tokens = new_tokens;
 
-	Compiler_Translate(compiler);
+	//Compiler_Translate(compiler);
 
-	//while (compiler->tokenizer->tokens->current > 0)
-	//{
-	//	test = Stack_pop(compiler->tokenizer->tokens);
-	//	printf("%d %s\n", test->token, test->content);
-	//}
+	while (compiler->tokenizer->tokens->current > 0)
+	{
+		test = Stack_pop(compiler->tokenizer->tokens);
+		printf("[%d, \"%s\"]\n", test->token, test->content);
+	}
 
 
 
