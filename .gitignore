@@ -1,0 +1,8 @@
+/.vs
+/Test
+/x64
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.cpp
