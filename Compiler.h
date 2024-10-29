@@ -16,17 +16,16 @@ void Compiler_Init(Compiler* compiler, const char* filename);
 void Compiler_Compile(Compiler* compiler);
 void Compiler_Translate(Compiler* compiler);
 
-int Compiler_HandleToken_def(Compiler* compiler, Token* token);
-int Compiler_HandleToken_defsym(Compiler* compiler, Token* token);
-int Compiler_HandleToken_sym(Compiler* compiler, Token* token);
-int Compiler_HandleToken_eoi(Compiler* compiler, Token* token);
-int Compiler_HandleToken_lit(Compiler* compiler, Token* token);
-int Compiler_HandleToken_equ(Compiler* compiler, Token* token);
-int Compiler_HandleToken_mop(Compiler* compiler, Token* token);
+int Compiler_HandleToken_def(Compiler* it, Token* token); 
+int Compiler_HandleToken_sym(Compiler* it, Token* token);
+int Compiler_HandleToken_eoi(Compiler* it, Token* token);
+int Compiler_HandleToken_lit(Compiler* it, Token* token);
+int Compiler_HandleToken_equ(Compiler* it, Token* token);
+int Compiler_HandleToken_mop(Compiler* it, Token* token);
 
-int Compiler_NullTest(Compiler* compiler);
+int Compiler_NullTest(Compiler* it);
 
-long Compiler_AddSymbol(Compiler* compiler, Token* token);
-long Compiler_FindSymbol(Compiler* compiler, Token* token);
+long Compiler_AddSymbol(Compiler* it, Token* token);
+long Compiler_FindSymbol(Compiler* it, Token* token);
 
  

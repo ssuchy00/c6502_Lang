@@ -56,7 +56,7 @@ void Compiler_Compile(Compiler* compiler)
 
 	compiler->tokenizer->tokens = new_tokens;
 
-	//Compiler_Translate(compiler);
+	Compiler_Translate(compiler);
 
 	while (compiler->tokenizer->tokens->current > 0)
 	{
@@ -80,7 +80,7 @@ void Compiler_Translate(Compiler* compiler)
 	{
 		curr = Stack_pop(compiler->tokenizer->tokens);
 		compiler->current = curr;
-		compiler->prev = NULL;
+		compiler->prev = Tokenizer_CreateToken(-1, "");
 		switch (curr->token)
 		{
 		case TK_DEF: 
@@ -88,182 +88,215 @@ void Compiler_Translate(Compiler* compiler)
 			break;
 		}
 
-		//printf("--RET %d-- \n", ret);
+		if(ret>0)printf("--RET %d-- \n", ret);
 	}
 
 }
 
-int Compiler_HandleToken_def(Compiler* compiler, Token* token)
+int Compiler_HandleToken_def(Compiler* it, Token* token)
 {
-	if (!Compiler_NullTest(compiler))return 1;
+	if (!Compiler_NullTest(it))return 1;
 	if (token == NULL)return 1;
 
-	Token* next = Stack_pop(compiler->tokenizer->tokens);
+	Token* next = Stack_pop(it->tokenizer->tokens);
+
 	switch (next->token)
 	{
 	case TK_SYM:
-		compiler->prev = token;
-		return Compiler_HandleToken_sym(compiler, next);
+		it->prev = token;
+		return Compiler_HandleToken_sym(it, next);
 		break;
-	default:
+	default: 
 		return 1;
 	}
+
 	return 0;
 }
+ 
 
-int Compiler_HandleToken_defsym(Compiler* compiler, Token* token)
+int Compiler_HandleToken_sym(Compiler* it, Token* token)
 {
-	
-}
-
-int Compiler_HandleToken_sym(Compiler* compiler, Token* token)
-{
-	if (!Compiler_NullTest(compiler))return 1;
+	if (!Compiler_NullTest(it))return 1;
 	if (token == NULL)return 1;
 
-	Token* next = Stack_pop(compiler->tokenizer->tokens);
+	Token* next = Stack_pop(it->tokenizer->tokens);
+	Token* prev = it->prev;
+	long address = -1;
 
-	if (compiler->prev->token == TK_MOP)
+	//Check prev token
+	switch (prev->token)
 	{
-		if (strcmp(compiler->prev->content, "+") == 0)
+	case TK_DEF: //prev
+		address = Compiler_AddSymbol(it, token); //ADD ADDRESS TO STACK
+		//Check next token
+		switch (next->token)
 		{
-			long address = -1;
-			address = Compiler_FindSymbol(compiler, token);
-			printf("ADC $%ld (%s)\n", address, token->content);
-		}
-	}
-
-	if (compiler->prev->token == TK_EQU)
-	{
-		long address = -1;
-		address = Compiler_FindSymbol(compiler, token);
-		printf("LDA $%ld (%s)\n", address, token->content);
-	}
-
-	switch (next->token)
-	{
-	case TK_EQU: {
-		long address = -1;
-		if (compiler->prev == TK_DEF)
-			address = Compiler_AddSymbol(compiler, token);
-		else if (compiler->prev == NULL)
-			address = Compiler_FindSymbol(compiler, token);
-		compiler->prev = token;
-		return Compiler_HandleToken_equ(compiler, next);
-		break;
-	}
-	case TK_MOP: {
-		compiler->prev = token;
-		return Compiler_HandleToken_mop(compiler, next);
-	}
-	case TK_EOI:
-		printf("PHA\n");
-		compiler->prev = token;
-		return Compiler_HandleToken_eoi(compiler, next);
-		break;
-	default:
-		return 1;
-	}
-	return 0;
-}
-
-int Compiler_HandleToken_eoi(Compiler* compiler, Token* token)
-{
-	if (!Compiler_NullTest(compiler))return 1;
-	if (token == NULL)return 1;
-	return 0;
-}
-
-int Compiler_HandleToken_lit(Compiler* compiler, Token* token)
-{
-	if (!Compiler_NullTest(compiler))return 1;
-	if (token == NULL)return 1;
-	Token* next = Stack_pop(compiler->tokenizer->tokens);
-	switch (next->token)
-	{
-	case TK_EOI: {
-		if (compiler->prev->token == TK_EQU)
-		{
-			printf("LDA %s\n", token->content);
-		}
-		else if(compiler->prev->token == TK_MOP) {
-			if (strcmp(compiler->prev->content, "+") == 0)
-			{
-				printf("ADC %s\n", token->content);
-			}
-		}
-		else {
+		case TK_EOI://->EOI: LDA 0, PHA
+			printf("LDA 0\n");
+			printf("PHA\n");
+			return 0;
+		case TK_EQU://->EQU: 
+			it->prev = token;
+			return Compiler_HandleToken_equ(it, next);
+		default:
 			return 1;
 		}
-		printf("PHA\n");
 
-		return 0;
+		break;
+	case TK_EQU: //prev
+		address = Compiler_FindSymbol(it, token);//GET SYMBOL FROM STACK
+		switch (next->token)
+		{
+		case TK_EOI://->EOI: LDA $X, PHA
+			printf("LDA $%ld (%s)\n", address, token->content);
+			printf("PHA\n");
+			return 0;
+		case TK_MOP://->MOP: --
+			it->prev = token;
+			return Compiler_HandleToken_mop(it, next);
+		default:
+			return 1;
+		}
 
-	}
-	default:
+		break;
+	case TK_MOP: //prev
+		address = Compiler_FindSymbol(it, token);//GET SYMBOL FROM STACK
+		if (strcmp("+", prev->content) == 0)
+		{
+			printf("ADC $%ld (%s)\n", address, token->content);
+		}
+		switch (next->token)
+		{
+		case TK_EOI://->EOI: PHA
+			printf("PHA\n");
+			return 0;
+		case TK_MOP://->MOP:
+			it->prev = token;
+			return Compiler_HandleToken_mop(it, next);
+		default:
+			return 1;
+		}
+	
+	default: 
 		return 1;
 	}
-	return 0;
-}
-
-int Compiler_HandleToken_equ(Compiler* compiler, Token* token)
-{
-	if (!Compiler_NullTest(compiler))return 1;
-	if (token == NULL)return 1;
-
-	Token* next = Stack_pop(compiler->tokenizer->tokens);
-	switch (next->token)
-	{
-	case TK_SYM:
-		compiler->prev = token;
-		return Compiler_HandleToken_sym(compiler, next);
-		break;
-	case TK_LIT:
-		compiler->prev = token;
-		return Compiler_HandleToken_lit(compiler, next);
-		break;
 	 
-	default:
-		return 1;
-	}
 	return 0;
 }
 
-int Compiler_HandleToken_mop(Compiler* compiler, Token* token)
+int Compiler_HandleToken_eoi(Compiler* it, Token* token)
 {
-	if (!Compiler_NullTest(compiler))return 1;
+	if (!Compiler_NullTest(it))return 1;
 	if (token == NULL)return 1;
-	Token* next = Stack_pop(compiler->tokenizer->tokens);
+	return 0;
+}
+
+int Compiler_HandleToken_lit(Compiler* it, Token* token)
+{
+	if (!Compiler_NullTest(it))return 1;
+	if (token == NULL)return 1;
+
+	Token* next = Stack_pop(it->tokenizer->tokens);
+	Token* prev = it->prev;
+
+	//Check prev token
+	switch (prev->token)
+	{
+	case TK_EQU:	//prev
+		//Check next token
+		switch (next->token)
+		{
+		case TK_EOI://->EOI: LDA X, PHA
+			printf("LDA %s\n", token->content);
+			printf("PHA\n");
+			return 0;
+		case TK_MOP:
+			printf("LDA %s\n", token->content);
+			it->prev = token;
+			return Compiler_HandleToken_mop(it, next);//->MOP: --	
+		default:
+			return 1;
+		}
+			
+		return 0;
+	case TK_MOP:	//prev
+		if (strcmp("+", prev->content) == 0)
+		{
+			printf("ADC %s\n", token->content);
+		}
+
+		switch (next->token)
+		{
+		case TK_EOI://->EOI: PHA 
+			printf("PHA\n");
+			return 0;
+		case TK_MOP:
+			it->prev = token;
+			return Compiler_HandleToken_mop(it, next);
+		default: 
+			return 1;
+		}
+	}
+	 
+	return 0;
+}
+
+int Compiler_HandleToken_equ(Compiler* it, Token* token)
+{
+	if (!Compiler_NullTest(it))return 1;
+	if (token == NULL)return 1;
+
+	Token* next = Stack_pop(it->tokenizer->tokens);
 	switch (next->token)
 	{
-	case TK_SYM: {
-		compiler->prev = token;
-		return Compiler_HandleToken_sym(compiler, next);
-	}
-	case TK_LIT: {
-		compiler->prev = token;
-		return Compiler_HandleToken_lit(compiler, next);
-	}
-	default:
+	case TK_LIT:
+		it->prev = token;
+		return Compiler_HandleToken_lit(it, next);
+	case TK_SYM:
+		it->prev = token;
+		return Compiler_HandleToken_sym(it, next);
+	default: 
 		return 1;
 	}
+
 	return 0;
 }
 
-int Compiler_NullTest(Compiler* compiler)
+int Compiler_HandleToken_mop(Compiler* it, Token* token)
 {
-	if (compiler == NULL)return 0;
-	if (compiler->tokenizer == NULL)return 0;
-	if (compiler->tokenizer->tokens == NULL)return 0;
+	if (!Compiler_NullTest(it))return 1;
+	if (token == NULL)return 1;
+	 
+	Token* next = Stack_pop(it->tokenizer->tokens);
+	switch (next->token)
+	{
+	case TK_LIT:
+		it->prev = token;
+		return Compiler_HandleToken_lit(it, next);
+	case TK_SYM:
+		it->prev = token;
+		return Compiler_HandleToken_sym(it, next);
+	default:
+		return 1;
+	}
+
+	return 0;
+}
+
+int Compiler_NullTest(Compiler* it)
+{
+	if (it == NULL)return 0;
+	if (it->tokenizer == NULL)return 0;
+	if (it->tokenizer->tokens == NULL)return 0;
 	return 1;
 }
 
-long Compiler_AddSymbol(Compiler* compiler, Token* token)
+long Compiler_AddSymbol(Compiler* it, Token* token)
 {
 	return 0;
 }
 
-long Compiler_FindSymbol(Compiler* compiler, Token* token)
+long Compiler_FindSymbol(Compiler* it, Token* token)
 {
 	return 0;
 }
