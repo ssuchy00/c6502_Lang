@@ -2,6 +2,11 @@
 #include "Tokenizer.h"
 #include "Stack.h"
 #include "File.h"
+#include "Symbol.h"
+
+
+//SCREEN START $0200
+//SCREEN END $05FF
 
 typedef struct compiler_t {
 	File* file;
@@ -9,6 +14,7 @@ typedef struct compiler_t {
 	Stack* memstack;
 	Token* current;
 	Token* prev;
+	long stp;
 } Compiler;
 
 Compiler* Compiler_Create();

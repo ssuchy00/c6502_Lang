@@ -9,6 +9,7 @@ Compiler* Compiler_Create()
 	compiler->memstack = NULL;
 	compiler->current = NULL;
 	compiler->prev = NULL;
+	compiler->stp = 0x0100;
 	compiler->tokenizer = Tokenizer_Create();
 	if (compiler->tokenizer == NULL)
 	{
@@ -78,6 +79,7 @@ void Compiler_Translate(Compiler* compiler)
 	int ret = 0;
 	while (compiler->tokenizer->tokens->current > 0)
 	{
+		 
 		curr = Stack_pop(compiler->tokenizer->tokens);
 		compiler->current = curr;
 		compiler->prev = Tokenizer_CreateToken(-1, "");
@@ -86,6 +88,8 @@ void Compiler_Translate(Compiler* compiler)
 		case TK_DEF: 
 			ret = Compiler_HandleToken_def(compiler, curr);
 			break;
+		default: 
+			ret = 1;
 		}
 
 		if(ret>0)printf("--RET %d-- \n", ret);
@@ -132,8 +136,8 @@ int Compiler_HandleToken_sym(Compiler* it, Token* token)
 		switch (next->token)
 		{
 		case TK_EOI://->EOI: LDA 0, PHA
-			printf("LDA 0\n");
-			printf("PHA\n");
+			printf("LDA $0000\n");
+			printf("STA $%.4x\n", address);
 			return 0;
 		case TK_EQU://->EQU: 
 			it->prev = token;
@@ -148,8 +152,8 @@ int Compiler_HandleToken_sym(Compiler* it, Token* token)
 		switch (next->token)
 		{
 		case TK_EOI://->EOI: LDA $X, PHA
-			printf("LDA $%ld (%s)\n", address, token->content);
-			printf("PHA\n");
+			printf("LDA $%.4x \n", address);
+			printf("STA $%.4x\n", it->stp-1);
 			return 0;
 		case TK_MOP://->MOP: --
 			it->prev = token;
@@ -163,12 +167,12 @@ int Compiler_HandleToken_sym(Compiler* it, Token* token)
 		address = Compiler_FindSymbol(it, token);//GET SYMBOL FROM STACK
 		if (strcmp("+", prev->content) == 0)
 		{
-			printf("ADC $%ld (%s)\n", address, token->content);
+			printf("ADC $%.4x \n", address); 
 		}
 		switch (next->token)
 		{
 		case TK_EOI://->EOI: PHA
-			printf("PHA\n");
+			printf("STA $%.4x\n", it->stp-1);
 			return 0;
 		case TK_MOP://->MOP:
 			it->prev = token;
@@ -207,11 +211,11 @@ int Compiler_HandleToken_lit(Compiler* it, Token* token)
 		switch (next->token)
 		{
 		case TK_EOI://->EOI: LDA X, PHA
-			printf("LDA %s\n", token->content);
-			printf("PHA\n");
+			printf("LDA #%s\n",  token->content);
+			printf("STA $%.4x\n", it->stp-1);
 			return 0;
 		case TK_MOP:
-			printf("LDA %s\n", token->content);
+			printf("LDA #%s\n", token->content);
 			it->prev = token;
 			return Compiler_HandleToken_mop(it, next);//->MOP: --	
 		default:
@@ -222,13 +226,13 @@ int Compiler_HandleToken_lit(Compiler* it, Token* token)
 	case TK_MOP:	//prev
 		if (strcmp("+", prev->content) == 0)
 		{
-			printf("ADC %s\n", token->content);
+			printf("ADC #%s\n", token->content);
 		}
 
 		switch (next->token)
 		{
 		case TK_EOI://->EOI: PHA 
-			printf("PHA\n");
+			printf("STA $%.4x\n", it->stp-1);
 			return 0;
 		case TK_MOP:
 			it->prev = token;
@@ -247,6 +251,10 @@ int Compiler_HandleToken_equ(Compiler* it, Token* token)
 	if (token == NULL)return 1;
 
 	Token* next = Stack_pop(it->tokenizer->tokens);
+	Token* prev = it->prev; 
+
+	if (prev->token != TK_SYM)return 1;
+
 	switch (next->token)
 	{
 	case TK_LIT:
@@ -293,10 +301,27 @@ int Compiler_NullTest(Compiler* it)
 
 long Compiler_AddSymbol(Compiler* it, Token* token)
 {
-	return 0;
+	if (it == NULL || token == NULL)return -1;
+	if (it->memstack == NULL)return -1;
+
+	Symbol* symbol = malloc(sizeof(Symbol));
+	if (symbol == NULL)return -1;
+	symbol->symbol= token->content;
+	symbol->address = it->stp;
+	Stack_push(it->memstack, symbol);
+
+	return it->stp++;
 }
 
 long Compiler_FindSymbol(Compiler* it, Token* token)
 {
-	return 0;
+	if (it == NULL || token == NULL)return -1;
+	if (it->memstack == NULL)return -1;
+
+	for (int i = 0; i < it->memstack->current; i++)
+	{
+		Symbol* sym = it->memstack->elements[i];
+		if (strcmp(token->content, sym->symbol) == 0)return sym->address;
+	}
+	return -1;
 }
